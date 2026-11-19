@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14284b">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<title>Bowling Coach</title>
+<style>
+:root{--navy:#14284b;--red:#c8323c;--bg:#f3f5f8;--card:#fff;--line:#dde2ea;--mute:#5b6678;--ok:#1f7a4d}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--navy);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{padding:env(safe-area-inset-top) 0 calc(72px + env(safe-area-inset-bottom))}
+header{background:var(--navy);color:#fff;padding:16px 18px}
+header h1{margin:0;font-size:20px;font-weight:700;letter-spacing:.2px}
+header p{margin:2px 0 0;font-size:13px;opacity:.8}
+main{max-width:640px;margin:0 auto;padding:16px}
+h2{font-size:22px;margin:4px 0 12px;font-weight:700}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin:0 0 12px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.stat{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--red);border-radius:10px;padding:12px}
+.stat b{display:block;font-size:26px;line-height:1.1}
+.stat span{font-size:13px;color:var(--mute)}
+button,select,input[type=text]{font:inherit;color:var(--navy)}
+button{border:1px solid var(--navy);background:#fff;border-radius:8px;padding:10px 14px;min-height:44px;cursor:pointer}
+button.p{background:var(--navy);color:#fff}
+button.d{border-color:var(--red);color:var(--red)}
+button:disabled{opacity:.45}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--red);outline-offset:2px}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.row>*{flex:1 1 auto}
+select,input[type=text]{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff;min-height:44px}
+label{display:block;font-size:14px;color:var(--mute);margin:10px 0 4px}
+video{width:100%;max-height:60vh;background:#000;border-radius:8px;display:block}
+.msg{padding:10px 12px;border-radius:8px;margin:10px 0;font-size:14px}
+.err{background:#fdeceb;border:1px solid var(--red);color:#8f1d26}
+.info{background:#e8eef8;border:1px solid #c5d2ea}
+.okm{background:#e7f4ec;border:1px solid #b6dcc3;color:var(--ok)}
+.mute{color:var(--mute);font-size:14px}
+.item{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.item h3{margin:0;font-size:16px}
+nav{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;border-radius:0;min-height:56px;color:var(--mute);font-weight:600}
+nav button[aria-current=page]{color:var(--navy);box-shadow:inset 0 3px 0 var(--red)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header><h1>Bowling Coach</h1><p>Your personal fast-bowling log</p></header>
+<main>
+<section id="home">
+  <h2>Home</h2>
+  <div class="stats">
+    <div class="stat"><b id="sN">0</b><span>Saved sessions</span></div>
+    <div class="stat"><b id="sS">0 MB</b><span>Video stored</span></div>
+  </div>
+  <div class="card"><b>Last session</b><div id="last" class="mute">No sessions saved yet. Record or import a video to start.</div></div>
+  <div class="msg info">Analysis is not built yet. Speed, line and length, pose and no-ball checks arrive in the next stages, and nothing here is estimated.</div>
+  <div id="persist" class="mute"></div>
+</section>
+
+<section id="rec" hidden>
+  <h2>Record or import</h2>
+  <div class="card">
+    <b>Camera position</b>
+    <p class="mute" style="margin:4px 0 0">Side view: tripod at the side of the crease, whole run-up and delivery in frame. Rear view: behind the stumps, at hip height. Keep the phone still.</p>
+  </div>
+  <div class="card">
+    <video id="live" playsinline muted hidden></video>
+    <div id="camInfo" class="mute" hidden></div>
+    <div class="row">
+      <button class="p" id="camOn">Open camera</button>
+      <button class="p" id="recGo" hidden>Start recording</button>
+      <button id="camOff" hidden>Close camera</button>
+    </div>
+    <div class="mute">For ball tracking later, record with your phone's own slow-motion mode (120 or 240 fps), then import it below.</div>
+  </div>
+  <div class="card">
+    <label for="file" style="margin-top:0">Import a video from your gallery</label>
+    <input id="file" type="file" accept="video/*">
+  </div>
+  <div id="pend" class="card" hidden>
+    <b>Review before saving</b>
+    <video id="pv" controls playsinline style="margin-top:8px"></video>
+    <label for="fps">Frame rate of this video</label>
+    <select id="fps"><option>30</option><option>60</option><option>120</option><option>240</option></select>
+    <label for="note">Note (optional)</label>
+    <input id="note" type="text" maxlength="200">
+    <div class="row"><button class="p" id="save">Save session</button><button id="discard">Discard</button></div>
+  </div>
+  <div id="recMsg"></div>
+</section>
+
+<section id="list" hidden>
+  <h2>Sessions</h2>
+  <div class="row"><button id="expAll">Export session list</button></div>
+  <div id="items"></div>
+</section>
+
+<section id="play" hidden>
+  <div class="row"><button id="back">Back to sessions</button></div>
+  <h2 id="pTitle"></h2>
+  <video id="pl" controls playsinline></video>
+  <div id="frame" class="mute" style="margin:6px 0">Frame 0</div>
+  <div class="row">
+    <button id="fb">Back 1 frame</button><button id="ff">Forward 1 frame</button>
+  </div>
+  <div class="row" id="speeds"></div>
+  <div class="mute" id="pMeta"></div>
+</section>
+<div id="toast"></div>
+</main>
+<nav>
+  <button data-v="home" aria-current="page">Home</button>
+  <button data-v="rec">Record</button>
+  <button data-v="list">Sessions</button>
+</nav>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const mb=b=>(b/1048576).toFixed(b<1048576*10?1:0)+' MB';
+const fmt=iso=>new Date(iso).toLocaleString([],{dateStyle:'medium',timeStyle:'short'});
+let db;
+
+/* ---------- Database (IndexedDB) ---------- */
+function openDB(){return new Promise((res,rej)=>{
+  if(!window.indexedDB)return rej(new Error('This browser has no local database support.'));
+  const r=indexedDB.open('bowling-coach',1);
+  r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('sessions',{keyPath:'id',autoIncrement:true});d.createObjectStore('videos')};
+  r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error||new Error('Database could not open.'));
+})}
+const listSessions=()=>new Promise((res,rej)=>{const q=db.transaction('sessions').objectStore('sessions').getAll();q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)});
+const getOne=(store,key)=>new Promise((res,rej)=>{const q=db.transaction(store).objectStore(store).get(key);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)});
+function saveSession(meta,blob){return new Promise((res,rej)=>{
+  const t=db.transaction(['sessions','videos'],'readwrite');
+  const r=t.objectStore('sessions').add(meta); /* add() never overwrites: every session gets a new id */
+  r.onsuccess=()=>t.objectStore('videos').put(blob,r.result);
+  t.oncomplete=()=>res(r.result);
+  t.onerror=t.onabort=()=>rej(t.error||new Error('Saving failed. Storage may be full.'));
+})}
+const removeSession=id=>new Promise((res,rej)=>{
+  const t=db.transaction(['sessions','videos'],'readwrite');
+  t.objectStore('sessions').delete(id);t.objectStore('videos').delete(id);
+  t.oncomplete=()=>res();t.onerror=t.onabort=()=>rej(t.error);
+});
+
+/* ---------- Navigation ---------- */
+function show(v){
+  ['home','rec','list','play'].forEach(x=>$('#'+x).hidden=x!==v);
+  document.querySelectorAll('nav button').forEach(b=>b.toggleAttribute('aria-current',b.dataset.v===(v==='play'?'list':v)));
+  if(v!=='rec')closeCam();
+  if(v!=='play'){const p=$('#pl');p.pause();}
+  if(v==='home')renderHome();if(v==='list')renderList();
+  scrollTo(0,0);
+}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.v));
+
+/* ---------- Home ---------- */
+async function renderHome(){
+  try{
+    const s=await listSessions();
+    $('#sN').textContent=s.length;
+    $('#sS').textContent=mb(s.reduce((a,x)=>a+(x.size||0),0));
+    const l=s[s.length-1];
+    $('#last').textContent=l?`${l.name} on ${fmt(l.date)}`:'No sessions saved yet. Record or import a video to start.';
+  }catch(e){$('#last').textContent='Could not read saved sessions: '+e.message}
+  if(navigator.storage&&navigator.storage.estimate){
+    const e=await navigator.storage.estimate();
+    $('#persist').textContent=`Phone storage used by this app: ${mb(e.usage||0)} of about ${mb(e.quota||0)} available to it.`;
+  }
+}
+
+/* ---------- Camera recording ---------- */
+let stream=null,mr=null,chunks=[],pending=null;
+const msg=(t,c)=>{$('#recMsg').innerHTML=t?`<div class="msg ${c}">${esc(t)}</div>`:''};
+function closeCam(){
+  if(mr&&mr.state==='recording')mr.stop();
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
+  $('#live').hidden=true;$('#camInfo').hidden=true;$('#camOn').hidden=false;$('#recGo').hidden=true;$('#camOff').hidden=true;
+}
+$('#camOn').onclick=async()=>{
+  msg('');
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||!window.MediaRecorder)return msg('This browser cannot record video. Use Chrome on Android, or import a video instead.','err');
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},frameRate:{ideal:120},width:{ideal:1280}},audio:false});
+  }catch(e){
+    const m={NotAllowedError:'Camera permission was denied. Allow camera access for this site in Chrome settings, then try again.',NotFoundError:'No camera was found on this device.',NotReadableError:'The camera is in use by another app. Close it and try again.'}[e.name];
+    return msg(m||'Camera could not start: '+e.message,'err');
+  }
+  const v=$('#live');v.srcObject=stream;v.hidden=false;await v.play();
+  const st=stream.getVideoTracks()[0].getSettings();
+  $('#camInfo').textContent=`Camera is running at ${st.width}x${st.height}, ${Math.round(st.frameRate||0)||'unknown'} fps.`;
+  $('#camInfo').hidden=false;$('#camOn').hidden=true;$('#recGo').hidden=false;$('#camOff').hidden=false;
+};
+$('#camOff').onclick=closeCam;
+$('#recGo').onclick=()=>{
+  if(mr&&mr.state==='recording'){mr.stop();return}
+  const type=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm','video/mp4'].find(t=>MediaRecorder.isTypeSupported(t));
+  try{mr=new MediaRecorder(stream,type?{mimeType:type}:{})}catch(e){return msg('Recording could not start: '+e.message,'err')}
+  chunks=[];const fps=Math.round(stream.getVideoTracks()[0].getSettings().frameRate||30);
+  mr.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+  mr.onerror=e=>msg('Recording failed: '+(e.error&&e.error.message||'unknown error'),'err');
+  mr.onstop=()=>{
+    const blob=new Blob(chunks,{type:mr.mimeType||'video/webm'});
+    $('#recGo').textContent='Start recording';
+    if(!blob.size){msg('Nothing was recorded. Try again.','err');return}
+    closeCam();setPending(blob,'camera',fps);
+  };
+  mr.start(1000);$('#recGo').textContent='Stop recording';msg('Recording…','info');
+};
+
+/* ---------- Import ---------- */
+$('#file').onchange=e=>{
+  const f=e.target.files[0];e.target.value='';msg('');if(!f)return;
+  if(!f.type.startsWith('video/'))return msg('That file is not a video. Choose an MP4, MOV or WebM file.','err');
+  setPending(f,'import',30);
+};
+
+/* ---------- Review and save ---------- */
+function setPending(blob,source,fps){
+  const v=$('#pv'),url=URL.createObjectURL(blob);
+  v.onloadedmetadata=()=>{
+    pending={blob,source};$('#pend').hidden=false;
+    const opts=[30,60,120,240];$('#fps').value=opts.reduce((a,b)=>Math.abs(b-fps)<Math.abs(a-fps)?b:a);
+    msg('Video loaded. Check the frame rate, then save.','okm');
+  };
+  v.onerror=()=>{pending=null;$('#pend').hidden=true;msg('This browser cannot play that video format, so it was not saved. Re-record it, or export it as MP4 (H.264) and import again.','err')};
+  v.src=url;
+}
+$('#discard').onclick=()=>{pending=null;$('#pend').hidden=true;$('#pv').removeAttribute('src');msg('Discarded.','info')};
+$('#save').onclick=async()=>{
+  if(!pending)return;
+  const now=new Date(),b=pending.blob;
+  const meta={date:now.toISOString(),source:pending.source,fps:+$('#fps').value,note:$('#note').value.trim(),size:b.size,mime:b.type,duration:$('#pv').duration||null,name:'Session '+now.toLocaleDateString([],{day:'numeric',month:'short'})+' '+now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})};
+  try{await saveSession(meta,b)}catch(e){return msg('Not saved: '+e.message,'err')}
+  if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
+  pending=null;$('#pend').hidden=true;$('#note').value='';$('#pv').removeAttribute('src');
+  msg('Saved. Find it under Sessions.','okm');
+};
+
+/* ---------- Sessions list ---------- */
+async function renderList(){
+  const box=$('#items');
+  try{
+    const s=(await listSessions()).reverse();
+    if(!s.length){box.innerHTML='<div class="card mute">No sessions yet. Open Record to add your first video.</div>';return}
+    box.innerHTML=s.map(x=>`<div class="card"><div class="item"><div><h3>${esc(x.name)}</h3><div class="mute">${esc(fmt(x.date))}, ${x.source==='camera'?'recorded':'imported'}, ${x.fps} fps, ${mb(x.size)}</div>${x.note?`<div class="mute">Note: ${esc(x.note)}</div>`:''}</div></div><div class="row"><button class="p" data-o="${x.id}">Open</button><button data-x="${x.id}">Save video</button><button class="d" data-d="${x.id}">Delete</button></div></div>`).join('');
+    box.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>openSession(+b.dataset.o));
+    box.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>exportVideo(+b.dataset.x));
+    box.querySelectorAll('[data-d]').forEach(b=>b.onclick=async()=>{
+      if(!confirm('Delete this session and its video from your phone? This cannot be undone.'))return;
+      try{await removeSession(+b.dataset.d);renderList()}catch(e){alert('Delete failed: '+e.message)}
+    });
+  }catch(e){box.innerHTML=`<div class="msg err">Could not load sessions: ${esc(e.message)}</div>`}
+}
+function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)}
+async function exportVideo(id){
+  const [m,b]=await Promise.all([getOne('sessions',id),getOne('videos',id)]);
+  if(!b)return alert('The video for this session is missing.');
+  download(b,`bowling-${m.date.slice(0,19).replace(/[:T]/g,'-')}.${(m.mime||'').includes('mp4')?'mp4':'webm'}`);
+}
+$('#expAll').onclick=async()=>{
+  const s=await listSessions();
+  if(!s.length)return alert('There are no sessions to export yet.');
+  download(new Blob([JSON.stringify(s,null,2)],{type:'application/json'}),'bowling-sessions.json');
+};
+
+/* ---------- Playback: slow motion and frame by frame ---------- */
+let curFps=30;
+async function openSession(id){
+  const [m,b]=await Promise.all([getOne('sessions',id),getOne('videos',id)]);
+  if(!m||!b)return alert('This session or its video could not be found.');
+  curFps=m.fps;show('play');
+  $('#pTitle').textContent=m.name;
+  $('#pMeta').textContent=`${m.fps} fps as set when saved. Frame numbers are worked out from this value, so set it correctly when you import.`+(m.note?` Note: ${m.note}`:'');
+  const v=$('#pl');v.src=URL.createObjectURL(b);v.playbackRate=1;upd();
+  v.onerror=()=>alert('This video could not be played by your browser.');
+}
+const upd=()=>{const v=$('#pl');$('#frame').textContent=`Frame ${Math.round(v.currentTime*curFps)} at ${v.currentTime.toFixed(3)} s`};
+$('#pl').ontimeupdate=upd;$('#pl').onseeked=upd;
+const stepF=d=>{const v=$('#pl');v.pause();v.currentTime=Math.max(0,Math.min(v.duration||0,v.currentTime+d/curFps))};
+$('#fb').onclick=()=>stepF(-1);$('#ff').onclick=()=>stepF(1);
+[0.1,0.25,0.5,1].forEach(r=>{const b=document.createElement('button');b.textContent=r+'x';b.onclick=()=>{$('#pl').playbackRate=r};$('#speeds').appendChild(b)});
+$('#back').onclick=()=>show('list');
+
+/* ---------- Start ---------- */
+openDB().then(d=>{db=d;renderHome()}).catch(e=>{document.querySelector('main').insertAdjacentHTML('afterbegin',`<div class="msg err">Local storage is unavailable, so nothing can be saved: ${esc(e.message)}</div>`)});
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
